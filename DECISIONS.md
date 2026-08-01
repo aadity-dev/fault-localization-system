@@ -3,6 +3,7 @@ Generated `data/ground_truth_topology.csv` alongside the stripped pole
 registry, containing the real seq_on_line/parent_pole_id for the 60% of
 DTs whose topology we deliberately null out. This is used only by our own
 offline evaluation script to measure how often our MST/geometric inference
+The ground truth file acts as a testing oracle for the simulator and offline evaluation. It is intentionally excluded from the runtime path so the backend is forced to solve the same incomplete-topology problem described in the assignment.
 (Phase 2) reconstructs the correct edge vs. reality. The backend never
 reads this file. We're keeping it in the repo for transparency rather than
 gitignoring it, since it's evidence of how we validated our approach.
