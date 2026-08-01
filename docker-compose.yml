@@ -1,0 +1,30 @@
+# docker-compose.yml
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: gridfault
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  backend:
+    build: ./backend
+    depends_on: [db, redis]
+    ports: ["8000:8000"]
+    environment:
+      DATABASE_URL: postgresql://admin:admin@db:5432/gridfault
+      REDIS_URL: redis://redis:6379
+
+  frontend:
+    build: ./frontend
+    depends_on: [backend]
+    ports: ["8501:8501"]
+
+volumes:
+  pgdata:
