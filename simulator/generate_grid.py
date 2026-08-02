@@ -31,11 +31,15 @@ def generate_dt_tree(dt_id, dt_lat, dt_lon, n_poles):
         lat += random.uniform(-0.0004, 0.0004)
         lon += random.uniform(-0.0004, 0.0004)
         pole_id = f"P-{uuid.uuid4().hex[:6]}" #Creates IDs likeP-a93f21 intead of p1, and p2 till 6 is good for ploes data which willnot be short or long
+
         poles.append({
             "pole_id": pole_id, "lat": lat, "lon": lon,
-            "dt_id": dt_id, "seq_on_line": seq, "parent_pole_id": parent
+            "dt_id": dt_id, "seq_on_line": seq, "parent_pole_id": parent##Upstream pole
         })
-        parent = pole_id
+         #dt_id ---> Which transformer supplies it
+        #seq_on_line ---> Position from the transformer
+
+        parent = pole_id 
         # occasionally branch off (spur)
         if random.random() < 0.15 and seq > 2:
             poles += generate_spur(parent, lat, lon, dt_id, seq)
