@@ -4,7 +4,8 @@ Generates synthetic pole_registry.csv and dt_registry.csv
 matching the proportions described in 02-data-and-systems.md
 """
 import csv, random, uuid
-from math import radians, cos, sin
+from math import radians, cos, sin 
+#generate gps coordinates
 
 random.seed(42)  # reproducible — put this in DECISIONS.md
 
@@ -12,9 +13,9 @@ N_SUBSTATIONS = 2
 FEEDERS_PER_SUB = 3
 DTS_PER_FEEDER = 3
 POLES_PER_DT_RANGE = (9, 240)   # brief's real range, but bias toward lower end for testing
-PCT_DT_MISSING_TOPOLOGY = 0.60
-PCT_POLES_NO_DEVICE = 0.09
-PCT_PINCODE_MISSING = 0.03
+PCT_DT_MISSING_TOPOLOGY = 0.60 #missing topology
+PCT_POLES_NO_DEVICE = 0.09 #poles without devices
+PCT_PINCODE_MISSING = 0.03 #missing PIN codes
 
 def generate_dt_tree(dt_id, dt_lat, dt_lon, n_poles):
     """
@@ -29,7 +30,7 @@ def generate_dt_tree(dt_id, dt_lat, dt_lon, n_poles):
     for seq in range(1, n_poles + 1):
         lat += random.uniform(-0.0004, 0.0004)
         lon += random.uniform(-0.0004, 0.0004)
-        pole_id = f"P-{uuid.uuid4().hex[:6]}"
+        pole_id = f"P-{uuid.uuid4().hex[:6]}" #Creates IDs likeP-a93f21 intead of p1, and p2 till 6 is good for ploes data which willnot be short or long
         poles.append({
             "pole_id": pole_id, "lat": lat, "lon": lon,
             "dt_id": dt_id, "seq_on_line": seq, "parent_pole_id": parent
