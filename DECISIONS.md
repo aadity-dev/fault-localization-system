@@ -89,4 +89,13 @@ repo root (so `data/` and `simulator/` resolve as siblings). This split
 caused most of the debugging friction during local development — worth
 calling out explicitly in DEPLOYMENT.md rather than assuming a reviewer
 won't hit the same confusion.
-
+#p4-->
+## Worker runs in-process (background thread), not a separate service
+Chose to run the ingestion worker as a background task inside the FastAPI
+process rather than a separate container/process, so ticket verification
+can read live pole state directly from shared memory (shared_tracker)
+without an extra round-trip. Tradeoff: this won't horizontally scale past
+one API instance. At 30-subdivision scale, this state would need to move
+to Redis (a hash of pole_id -> energized) so multiple API replicas could
+share it. Documented here rather than built, since a single subdivision
+doesn't need it.
