@@ -26,14 +26,13 @@ class Pole(Base):
     feeder_id = Column(String, nullable=False)
     dt_id = Column(String, ForeignKey("transformers.dt_id"), nullable=False)
 
-    # Nullable by design: missing for ~60% of DTs (the missing-topology problem)
     seq_on_line = Column(Integer, nullable=True)
     parent_pole_id = Column(String, nullable=True)
 
     pole_type = Column(String, nullable=True)
     ward = Column(String, nullable=True)
-    pincode = Column(String, nullable=True)     # missing for ~3% of poles
-    device_id = Column(String, nullable=True)   # missing for ~9% of poles (no telemetry coverage)
+    pincode = Column(String, nullable=True)
+    device_id = Column(String, nullable=True)
 
     transformer = relationship("Transformer", back_populates="poles")
 
