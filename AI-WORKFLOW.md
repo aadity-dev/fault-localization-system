@@ -21,3 +21,26 @@ fabricate one; wait for a real case.]
 Roughly [X]% of simulator code is AI-generated and reviewed/run by me;
 backend graph logic (Phase 2 onward) — update as you write it yourself vs.
 delegate it.
+
+## Case: AI-generated database.py and models.py got cross-contaminated during manual copy-paste
+While wiring up the backend schema, the SQLAlchemy `Base` definition
+(belongs in database.py) and the Pole/Transformer ORM classes (belongs in
+models.py) ended up merged into a single file during manual editing,
+causing a NameError (Column undefined) and a self-referential import
+error. Caught by actually running the import checks
+(`python -c "from app.database import Base"`) rather than assuming the
+paste was correct, and by inspecting file contents directly with `cat`
+before re-testing. This is a case where the AI-authored code was correct
+in isolation but broke during manual reassembly — the fix was verifying
+file contents against intent, not just re-running and hoping.
+
+
+
+### Case: feeder-rollup logic wrongly fired on single-DT feeders
+First version of localize_feeder() rolled up to a feeder incident whenever
+"every DT on the feeder" matched a full-DT-outage set — but for a
+single-DT feeder, that's trivially always true. Caught by the required
+pytest suite (test_full_dt_outage_is_one_incident failed, asserting
+'feeder' != 'dt'), not by manual inspection. Fixed by requiring >= 2 DTs
+before feeder-level rollup applies. Reproduced independently by running
+the same test suite myself before accepting the fix.

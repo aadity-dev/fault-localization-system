@@ -45,3 +45,38 @@ These columns are Optional/nullable from the first schema draft, not
 retrofitted later. This directly reflects the 60% missing-topology
 condition described in 02-data-and-systems.md §3, which we treat as the
 central design problem rather than an edge case.
+
+# Local Postgres for development, Docker Postgres for submission
+Ran into `psycopg2.OperationalError: Connection refused` when testing
+seed.py locally — no Postgres was running yet, since docker-compose.yml
+didn't exist at that point in the build. Installed Postgres locally via
+Homebrew to unblock development and verify seed.py against a real
+database before docker-compose was built. Final submission still runs
+Postgres inside Docker per G2 (one-command startup); the local install
+was purely to keep moving during development.
+
+
+## data/ exists in two places during local development
+CSVs are generated once at the repo root (`data/`) by
+simulator/generate_grid.py. During local backend development (before
+docker-compose.yml existed), a second copy was placed at `backend/data/`
+so seed.py's relative path resolution worked without extra config. Root
+`data/` remains the source of truth; `backend/data/` is a build artifact
+the Dockerfile will populate via COPY, and is gitignored to avoid
+duplicating CSVs in version control.
+
+#phase2
+## Single-DT feeders: default to DT-level, not feeder-level, on ambiguity
+When a feeder has only one DT, a full DT outage is indistinguishable from
+a full feeder outage by pole telemetry alone. Chose to report the more
+specific answer (DT-level) by requiring at least 2 DTs on a feeder before
+rolling incidents up to feeder-level. Caught via a failing pytest test
+before this shipped — verified independently on a second machine, same
+result.
+
+## MST inference accuracy measured at 87.6%
+Scored our geometric MST reconstruction (backend/app/graph/score_inference.py)
+against the private ground_truth_topology.csv: 333/380 inferred parent
+edges match reality across the 10 topology-stripped DTs in our synthetic
+grid. Documented as a measured number, not a guess, per the brief's
+"measure rather than guess" instruction on performance targets.
