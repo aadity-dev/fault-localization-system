@@ -29,7 +29,6 @@ from app.ingestion.queue import pop_telemetry
 DEBOUNCE_SECONDS = 30       # per 01-problem-context.md's debounce guidance
 STALE_RETRY_HOURS = 6        # discard power_lost older than this (§2, "Stale Retries")
 
-
 class PoleStateTracker:
     """
     In-memory pole state, rebuilt from telemetry as it arrives. This is
@@ -98,6 +97,19 @@ class PoleStateTracker:
             pole_id for pole_id, first_seen in self.pending_dark.items()
             if now - first_seen >= DEBOUNCE_SECONDS
         }
+
+
+# Module-level singleton, shared by the worker loop and by routers/tickets.py's
+# verify endpoint. Both need to see the SAME live pole state -- the worker
+# writes to it as telemetry arrives, the ticket router reads from it to decide
+# whether a "resolved" ticket can actually be verified.
+#
+# NOTE: this only works correctly if the worker loop and the FastAPI app run
+# in the same process (e.g. as an asyncio background task started in main.py's
+# startup event). If they're split into separate processes/containers later,
+# this needs to move to a shared store (Redis hash, DB table) instead of a
+# plain Python object -- flagged in DECISIONS.md as a scaling consideration.
+shared_tracker = PoleStateTracker()
 
 
 def run_worker_loop(tracker: PoleStateTracker, on_state_change=None, max_iterations=None):
