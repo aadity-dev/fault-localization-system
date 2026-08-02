@@ -80,3 +80,13 @@ against the private ground_truth_topology.csv: 333/380 inferred parent
 edges match reality across the 10 topology-stripped DTs in our synthetic
 grid. Documented as a measured number, not a guess, per the brief's
 "measure rather than guess" instruction on performance targets.
+
+#phase 3 
+## Two different working directories, by design, not accident
+`python -m app.*` and `pytest` commands must run from `backend/` (so `app`
+resolves as a package). `python simulator/*.py` commands must run from the
+repo root (so `data/` and `simulator/` resolve as siblings). This split
+caused most of the debugging friction during local development — worth
+calling out explicitly in DEPLOYMENT.md rather than assuming a reviewer
+won't hit the same confusion.
+

@@ -44,3 +44,16 @@ pytest suite (test_full_dt_outage_is_one_incident failed, asserting
 'feeder' != 'dt'), not by manual inspection. Fixed by requiring >= 2 DTs
 before feeder-level rollup applies. Reproduced independently by running
 the same test suite myself before accepting the fix.
+
+### Case: repeated directory-context errors during manual file assembly
+Multiple ModuleNotFoundError / ImportError failures during Phases 0-3
+traced back to running commands from the wrong working directory
+(backend/ vs backend/app/ vs repo root), plus two typo'd filenames
+(__intit__.py, ingests.py) introduced during manual copy-paste of
+AI-generated code. None were logic errors in the AI-generated code itself
+-- all were caught by actually running the commands and reading tracebacks
+carefully rather than assuming a paste or rename had succeeded. This
+pattern is the clearest evidence in this project of verifying AI output
+rather than trusting it blindly: every fix came from inspecting real
+file contents (cat, ls) and real error messages, not from re-generating
+code and hoping.

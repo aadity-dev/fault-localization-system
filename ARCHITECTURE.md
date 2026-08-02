@@ -32,3 +32,139 @@ independent of how many unique poles exist in the grid.
 **Driving it**: `simulator/run_scenario.py span|dt|feeder|noise` is the
 single command (and will back the UI's simulator controls) — satisfies
 G5.
+## Storage and internal model
+
+Two tables, matching the department's CSV exports column-for-column
+(pole_registry.csv, dt_registry.csv) — see 02-data-and-systems.md §3.
+
+`Pole`: pole_id (PK), lat/lon, feeder_id, dt_id (FK), seq_on_line,
+parent_pole_id, pole_type, ward, pincode, device_id.
+
+`Transformer`: dt_id (PK), feeder_id, lat/lon, capacity_kva,
+households_served.
+
+`seq_on_line` and `parent_pole_id` are nullable **by design**, present in
+the schema from the first draft rather than retrofitted — this directly
+reflects the 60%-missing-topology condition that is the assignment's
+central problem, not an edge case bolted on later.
+
+The database holds static topology (poles, transformers) — it is not used
+for live pole energized/dark state, which changes far faster than a DB
+round-trip justifies. Live state lives in-memory in the ingestion worker
+(see below) and is what actually drives localization.
+
+## Data sourcing and ingestion
+
+**Ingest endpoint** (`POST /telemetry`): validates the device payload
+against the exact schema in 02-data-and-systems.md §2 (device_id, pole_id,
+event, energized, ts, seq, battery_mv, rssi, fw), pushes it onto a Redis
+list, and returns 202 Accepted immediately. No graph work happens inside
+the HTTP handler — this is what lets the endpoint survive a burst without
+buckling (§1: up to 5,000 messages in 10 seconds).
+
+**Queue** (Redis, single LIST, LPUSH/BRPOP): a simple FIFO queue was
+sufficient at this scale (one subdivision, a few thousand poles) — see
+DECISIONS.md for why we didn't reach for a heavier broker like Kafka.
+
+**Worker** (`app/ingestion/worker.py`): drains the queue and maintains
+in-memory pole state. Two responsibilities directly mirroring the brief's
+dirty-data rules:
+
+- **Dedup/ordering**: uses `(device_id, seq)`, not `ts`, since device
+  clocks skew up to ±90 seconds and are unreliable for cross-device
+  ordering (§2). A message with `seq` ≤ the last-seen `seq` for that
+  device is dropped as a duplicate or stale retry.
+- **Stale-retry filtering**: `power_lost` events older than 6 hours (by
+  device timestamp) are discarded — offline devices retry buffered
+  messages for up to 6 hours per §2, and a very old retry should not
+  raise a fresh ticket for a long-resolved incident.
+- **Debounce**: a pole is only added to the "ready for localization"
+  set after being continuously dark for 30 seconds, absorbing burst
+  duplicates and out-of-order arrival before triggering a graph run.
+
+## The localization algorithm
+
+**Topology construction** (`app/graph/build_topology.py`): one directed
+graph per DT.
+
+- 40% case (known `parent_pole_id`): edges taken directly from the data,
+  tagged VERIFIED, confidence 0.95.
+- 60% case (missing topology): edges reconstructed via a geometric
+  Minimum Spanning Tree over Haversine distance, rooted at the DT's own
+  coordinates, tagged INFERRED, confidence 0.60. Edges point away from the
+  DT (matching real power-flow direction) via a BFS re-rooting step.
+
+We validated the MST approach against a held-out ground-truth topology
+generated alongside our synthetic grid (`ground_truth_topology.csv`,
+never read by the running system — see Simulator section above). Measured
+result: **87.6% edge-level accuracy** (333/380 correct parent assignments
+across the 10 topology-stripped DTs in our test grid). Known limitation:
+real wires bend around buildings and roads; the MST assumes straight
+lines, so errors cluster near branch points where Euclidean distance
+doesn't reflect true spur structure.
+
+**Boundary traversal** (`app/graph/localize.py`): per 01-problem-context.md
+§2, a fault is the frontier between the live region and the dark region.
+For each DT graph, we find every edge (parent, child) where parent is
+live and child is dark — each is a candidate span-fault boundary.
+Downstream poles are collected via graph descendants (BFS), and
+overlapping boundaries are merged so one physical fault produces one
+incident regardless of how many poles are affected.
+
+**Grouping and multi-fault handling**: DT-level faults (every device-
+bearing pole under a DT is dark) are reported once, not as N span
+alerts. Feeder-level faults (every DT on a feeder down) are rolled up
+similarly — but only when a feeder has 2+ DTs; a single-DT feeder's full
+outage is reported at DT-level, since it's indistinguishable from a
+feeder fault by pole data alone and DT-level is the more specific,
+defensible answer (see DECISIONS.md). Independent boundaries — in the
+same or different DTs — are each reported as separate incidents, so three
+simultaneous span faults produce three tickets, not one merged ticket
+and not thirty.
+
+**Complexity**: topology construction is O(N log N) per DT for the MST
+(N = poles under that DT, typically 15-80 in our test grid); boundary
+traversal is O(E) per DT. Both run once per debounce cycle, not per
+message, keeping this well inside the 120s p95 target even at burst load.
+
+## Noise handling
+
+**Dead-sensor / "lying sensor" filtering** (`app/graph/localize.py`,
+`is_dead_sensor`): a pole reporting dark whose children are still live is
+physically impossible as a real line fault — power cannot skip a dead
+wire on a radial network (01-problem-context.md §2). Such poles are
+excluded from the dark set before boundary-finding runs, so they never
+generate a ticket.
+
+**Scheduled-outage cross-check** (`app/graph/noise_filter.py`): the
+scheduled-outage feed is not trusted blindly, per 02-data-and-systems.md
+§4 — outages start late, overrun by 20-40 minutes, and ~10% are cancelled
+without the feed updating. We widen the outage window with documented
+slack (15 min early-start allowance, 40 min overrun allowance) and then
+verify coverage: if an incident's affected poles cover the *full* scope
+of a matching scheduled outage, it's suppressed as planned maintenance.
+If only a *subset* of poles are dark while the rest of the scope stays
+live, the incident is kept — that pattern indicates a real fault
+happening during, not because of, the maintenance window.
+
+**Debounce** (see Data sourcing above) is the third leg of noise
+handling: a single ambiguous dark signal doesn't trigger localization
+until it's persisted for 30 seconds, absorbing the "one dying message,
+maybe lost" ambiguity described in 01-problem-context.md §4.
+
+**Test coverage**: 16 tests across five files, organized by the specific
+failure mode each guards against (span faults, DT faults, missing-
+topology fallback, dead-sensor suppression, scheduled-outage handling,
+worker dedup/debounce) — see `backend/tests/`.
+
+## API surface (so far)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/health` | Liveness check |
+| POST | `/telemetry` | Accepts one device telemetry message, queues it, returns 202 |
+| GET | `/telemetry/queue-status` | Current Redis queue depth (observability) |
+
+Remaining endpoints (`/tickets`, `/scheduled-outages`, `/simulate/*`) are
+
+
