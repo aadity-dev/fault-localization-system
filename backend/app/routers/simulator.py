@@ -1,0 +1,131 @@
+"""
+backend/app/routers/simulator.py
+
+POST /simulate/fault, POST /simulate/restore -- lets the operator UI (or
+a single documented curl command) drive the simulator without a separate
+terminal session. This is what satisfies G5: "the fault simulator is
+runnable from that public URL or from one documented command."
+
+Reuses the exact same fault-injection and telemetry-emission logic as
+simulator/*.py (imported directly, not reimplemented) so there is only
+ONE implementation of "what telemetry does a span/DT/feeder fault
+produce" -- the standalone CLI simulator and this HTTP-triggered version
+share it.
+
+Rather than round-tripping over HTTP to our own /telemetry endpoint (an
+unnecessary hop when we're already in the same process), this pushes
+directly onto the Redis queue via app.ingestion.queue -- the same queue
+/telemetry uses, so behavior is identical from the worker's perspective.
+"""
+
+import os
+import sys
+
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.ingestion.queue import push_telemetry
+from app.models import Pole
+
+router = APIRouter(prefix="/simulate")
+
+# simulator/ lives as a sibling to backend/ at the repo root -- add it to
+# the path so we can import the exact same fault/telemetry logic used by
+# the standalone CLI, rather than duplicating it here.
+_SIMULATOR_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "simulator")
+if _SIMULATOR_PATH not in sys.path:
+    sys.path.insert(0, _SIMULATOR_PATH)
+
+from inject_fault import (  # noqa: E402
+    inject_dt_fault,
+    inject_feeder_fault,
+    load_ground_truth,
+    pick_random_span_fault,
+)
+from telemetry_emitter import emit_outage_telemetry, build_restoration_payloads  # noqa: E402
+
+
+def _poles_as_dicts(db: Session):
+    return [
+        {"pole_id": p.pole_id, "lat": p.lat, "lon": p.lon, "feeder_id": p.feeder_id,
+         "dt_id": p.dt_id, "seq_on_line": p.seq_on_line, "parent_pole_id": p.parent_pole_id,
+         "device_id": p.device_id}
+        for p in db.query(Pole).all()
+    ]
+
+
+@router.post("/fault/span")
+def simulate_span_fault(db: Session = Depends(get_db)):
+    poles = _poles_as_dicts(db)
+    ground_truth = load_ground_truth()  # falls back gracefully if file absent in prod
+    result = pick_random_span_fault(poles, ground_truth)
+
+    by_id = {p["pole_id"]: p for p in poles}
+    dark_dicts = [by_id[pid] for pid in result["dark_poles"] if pid in by_id]
+
+    payloads = emit_outage_telemetry(dark_dicts, dry_run=True)
+    for p in payloads:
+        push_telemetry(p)
+
+    return {
+        "fault_type": "span",
+        "fault_location": result["fault_location"],
+        "poles_should_go_dark": len(result["dark_poles"]),
+        "telemetry_messages_queued": len(payloads),
+    }
+
+
+@router.post("/fault/dt/{dt_id}")
+def simulate_dt_fault(dt_id: str, db: Session = Depends(get_db)):
+    poles = _poles_as_dicts(db)
+    result = inject_dt_fault(dt_id, poles)
+
+    by_id = {p["pole_id"]: p for p in poles}
+    dark_dicts = [by_id[pid] for pid in result["dark_poles"] if pid in by_id]
+
+    payloads = emit_outage_telemetry(dark_dicts, dry_run=True)
+    for p in payloads:
+        push_telemetry(p)
+
+    return {
+        "fault_type": "dt",
+        "fault_location": dt_id,
+        "poles_should_go_dark": len(result["dark_poles"]),
+        "telemetry_messages_queued": len(payloads),
+    }
+
+
+@router.post("/fault/feeder/{feeder_id}")
+def simulate_feeder_fault(feeder_id: str, db: Session = Depends(get_db)):
+    poles = _poles_as_dicts(db)
+    result = inject_feeder_fault(feeder_id, poles)
+
+    by_id = {p["pole_id"]: p for p in poles}
+    dark_dicts = [by_id[pid] for pid in result["dark_poles"] if pid in by_id]
+
+    payloads = emit_outage_telemetry(dark_dicts, dry_run=True)
+    for p in payloads:
+        push_telemetry(p)
+
+    return {
+        "fault_type": "feeder",
+        "fault_location": feeder_id,
+        "poles_should_go_dark": len(result["dark_poles"]),
+        "telemetry_messages_queued": len(payloads),
+    }
+
+
+@router.post("/restore/{pole_id}")
+def simulate_restore(pole_id: str, db: Session = Depends(get_db)):
+    """Sends boot + power_restored for one pole -- lets a demo show a ticket auto-verify."""
+    pole = db.query(Pole).filter(Pole.pole_id == pole_id).first()
+    if not pole or not pole.device_id:
+        return {"error": "pole not found or has no device"}
+
+    pole_dict = {"pole_id": pole.pole_id, "device_id": pole.device_id}
+    payloads = build_restoration_payloads(pole_dict, seq_start=0)
+    for p in payloads:
+        push_telemetry(p)
+
+    return {"pole_id": pole_id, "restoration_messages_queued": len(payloads)}
