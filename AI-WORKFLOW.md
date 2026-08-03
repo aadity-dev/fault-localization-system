@@ -36,6 +36,7 @@ file contents against intent, not just re-running and hoping.
 
 
 
+
 ### Case: feeder-rollup logic wrongly fired on single-DT feeders
 First version of localize_feeder() rolled up to a feeder incident whenever
 "every DT on the feeder" matched a full-DT-outage set — but for a
@@ -57,3 +58,22 @@ pattern is the clearest evidence in this project of verifying AI output
 rather than trusting it blindly: every fix came from inspecting real
 file contents (cat, ls) and real error messages, not from re-generating
 code and hoping.
+
+#### Case: scheduled-outage filter built but never wired into ticket creation
+noise_filter.py's filter_scheduled_outages() was written and tested in
+isolation (Phase 2) but ticket_creation.py never actually called it --
+tickets were created directly from localize_all() output. Caught by
+deliberately checking "does X call Y" via grep before assuming the
+pipeline was complete, not by the test suite (existing tests only
+verified the filter function itself worked, not that anything used it).
+Fixed by wiring it in and adding a dedicated integration test.
+
+## Case: timezone-naive default crashed the outage filter with real data
+noise_filter.py defaulted to datetime.utcnow() (timezone-naive) when no
+`now` was passed explicitly. Every existing test passed `now=` manually
+with a timezone-aware value, masking the bug. It only surfaced when
+ticket_creation.py called the filter without specifying `now`, using
+real timezone-aware outage timestamps -- a TypeError on comparison.
+Fixed by switching to datetime.now(timezone.utc). Good example of a test
+suite giving false confidence: 100% pass rate, but a real code path was
+untested until a new integration test exercised the actual call site.
