@@ -24,6 +24,12 @@ all), ±90s clock skew, shuffled arrival order, ~5% duplicate delivery,
 ~3% stale retries up to 6 hours old. Poles with no device are silently
 excluded, matching the ~9% coverage gap.
 
+**Test coverage**: 26 tests across seven files, organized by the specific
+failure mode each guards against (span faults, DT faults, missing-
+topology fallback, dead-sensor suppression, scheduled-outage handling,
+worker dedup/debounce, ticket lifecycle, ticket-creation wiring) — see
+`backend/tests/`.
+
 **Load testing** (`simulator/load_test.py`): separate from fault scenarios
 — fires synthetic message volume at the ingest endpoint to validate
 sustained (≥500 msg/s) and burst (5,000 msgs/10s) throughput targets,
@@ -157,14 +163,77 @@ failure mode each guards against (span faults, DT faults, missing-
 topology fallback, dead-sensor suppression, scheduled-outage handling,
 worker dedup/debounce) — see `backend/tests/`.
 
-## API surface (so far)
+
+## Ticket lifecycle
+
+Tickets move through: detected → acknowledged → crew_assigned → resolved
+→ verified → closed (`app/services/ticket_lifecycle.py`).
+
+The one rule enforced strictly: **verified can only be reached via
+telemetry confirmation, never a direct status update.** A `PATCH
+/tickets/{id}/status` request setting status="verified" is rejected
+outright (400). The only path to "verified" is `POST
+/tickets/{id}/verify`, which checks the CURRENT live-energized state of
+every pole the ticket claims is affected (read from the same in-memory
+tracker the ingestion worker updates) and refuses with 409 if any
+affected pole is still dark or has never reported live since the fault.
+
+This was proven end-to-end, not just unit tested: a ticket was walked
+through detected → resolved, `/verify` was correctly rejected (409)
+before restoration telemetry arrived, real `power_restored` telemetry
+was sent through the actual `/telemetry` endpoint, and a second
+`/verify` call succeeded (200) once the worker had processed it — the
+full "restoration confirmed from telemetry, not a button click"
+requirement, exercised live, not just asserted in a unit test.
+
+## Ingestion → localization → ticket, wired end to end
+
+The ingestion worker runs as a background thread inside the same process
+as the FastAPI app (not a separate service) — deliberate, so ticket
+verification can read live pole state directly from shared memory
+(`shared_tracker`) without an extra network hop. Tradeoff documented in
+DECISIONS.md: this doesn't horizontally scale past one API instance;
+scaling to multiple replicas would require moving pole state to Redis.
+
+On every worker loop iteration, the worker checks which poles have been
+continuously dark for 30+ seconds (debounced), and if any exist, runs
+them through `build_full_topology()` (loaded from the DATABASE, not CSV
+— the DB is the system of record once seeded) → `localize_all()` →
+`filter_scheduled_outages()` (cross-checked against the mocked outage
+feed before any ticket is created) → deduplication against currently
+open tickets, matched by incident type + location identity.
+
+**Known limitation, observed on real live testing** (not caught by unit
+tests, which all used complete/simultaneous telemetry): because
+telemetry for one physical fault can arrive in separate bursts (coverage
+gaps, legacy firmware, dying-breath failures), different branches of the
+same DT-level fault can cross the debounce threshold at different times,
+producing multiple span-level tickets instead of one DT-level ticket.
+Documented in DECISIONS.md as a "two more weeks" item — the fix requires
+a product decision (merge/upgrade strategy for open tickets), not a
+quick patch.
+
+## Coordinates and PIN code
+
+Ticket coordinates depend on incident type: span faults use the
+downstream pole's own surveyed GPS (the actual fault location); DT
+faults use the transformer's own coordinates; feeder faults leave
+coordinates unset — the UI should render these as a zone/DT list, not a
+map pin, since there is no single point for a feeder-wide fault. PIN
+code is pulled from the downstream pole's record where available
+(missing for ~3% of poles per the registry).
+
+## API surface
 
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/health` | Liveness check |
 | POST | `/telemetry` | Accepts one device telemetry message, queues it, returns 202 |
-| GET | `/telemetry/queue-status` | Current Redis queue depth (observability) |
-
-Remaining endpoints (`/tickets`, `/scheduled-outages`, `/simulate/*`) are
-
-
+| GET | `/telemetry/queue-status` | Current Redis queue depth |
+| GET | `/tickets` | List tickets, optional `?status=` filter |
+| GET | `/tickets/{id}` | Single ticket detail |
+| PATCH | `/tickets/{id}/status` | Ordinary lifecycle moves. Rejects any attempt to set "verified" directly. |
+| POST | `/tickets/{id}/verify` | Telemetry-enforced resolved→verified transition. 409 if affected poles aren't confirmed live. |
+| GET / POST / DELETE | `/scheduled-outages` | Mock department feed, shared with the ticket-creation noise filter |
+| POST | `/simulate/fault/span` \| `/fault/dt/{dt_id}` \| `/fault/feeder/{feeder_id}` | Drives the simulator via HTTP — satisfies G5. Reuses the same fault-injection/telemetry logic as the standalone CLI simulator. |
+| POST | `/simulate/restore/{pole_id}` | Sends restoration telemetry for one pole, to demonstrate auto-verification in the demo video |
