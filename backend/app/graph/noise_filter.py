@@ -17,7 +17,7 @@ this one is about matching an incident against an external (untrustworthy)
 schedule.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Real-world slack: outages start late and overrun. We don't suppress
 # alerts strictly within [start, end] -- we widen the window to absorb
@@ -39,7 +39,7 @@ def find_matching_outages(incident, scheduled_outages, now=None):
     (same dt_id or feeder_id) and whose (slack-widened) time window covers
     now.
     """
-    now = now or datetime.utcnow()
+    now = now or datetime.now(timezone.utc)
     matches = []
     for outage in scheduled_outages:
         if outage["scope"] == "dt" and outage["target_id"] == incident.get("dt_id"):
