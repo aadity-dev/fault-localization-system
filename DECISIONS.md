@@ -99,3 +99,33 @@ one API instance. At 30-subdivision scale, this state would need to move
 to Redis (a hash of pole_id -> energized) so multiple API replicas could
 share it. Documented here rather than built, since a single subdivision
 doesn't need it.
+
+### Known limitation: partial DT outages may fragment into multiple span tickets
+
+During testing, a single injected DT outage produced multiple span-level
+tickets instead of a single DT-level incident.
+
+The localization engine correctly reports only what can be confirmed from
+available telemetry. DT-level incidents are generated only when all
+required device-reporting poles within a transformer are confirmed dark.
+In realistic conditions (missing telemetry devices, legacy firmware,
+dying-breath failures, delayed reporting, and debounce timing), that
+condition may never be satisfied even though the underlying physical fault
+affects the entire transformer.
+
+As the worker continuously reprocesses the current dark-pole set, newly
+confirmed dark regions may be localized independently, producing multiple
+span incidents over time. Since the current implementation only prevents
+duplicate tickets for identical span boundaries, these independent span
+incidents remain separate tickets.
+
+Observed behaviour:
+- One injected DT fault
+- Three span-level tickets created over approximately three minutes
+- No DT-level ticket generated
+
+Future improvement:
+- Periodically re-evaluate existing open incidents.
+- Merge correlated span incidents within the same DT.
+- Upgrade correlated span incidents into a DT-level ticket once sufficient
+  evidence becomes available.
