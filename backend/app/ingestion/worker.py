@@ -125,11 +125,17 @@ def run_worker_loop(tracker: PoleStateTracker, on_state_change=None, max_iterati
     while max_iterations is None or iterations < max_iterations:
         payload = pop_telemetry(timeout_seconds=1)
         iterations += 1
-        if payload is None:
-            continue  # timeout, no message -- loop again (allows clean shutdown checks)
 
-        changed = tracker.apply(payload)
-        if changed and on_state_change:
+        if payload is not None:
+            tracker.apply(payload)
+
+        # Always recheck the debounce buffer, whether or not a new message
+        # arrived this iteration. A pole that's been dark for 30+ seconds
+        # needs to be picked up even if no further telemetry comes in --
+        # otherwise a fault only gets processed if a NEW message happens
+        # to land after the debounce window closes, which understates
+        # real latency and can miss faults with sparse telemetry entirely.
+        if on_state_change:
             on_state_change(tracker)
 
 
