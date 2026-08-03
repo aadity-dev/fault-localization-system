@@ -77,3 +77,35 @@ real timezone-aware outage timestamps -- a TypeError on comparison.
 Fixed by switching to datetime.now(timezone.utc). Good example of a test
 suite giving false confidence: 100% pass rate, but a real code path was
 untested until a new integration test exercised the actual call site.
+
+#### Case: scheduled-outage filter built but never wired into ticket creation
+noise_filter.py's filter_scheduled_outages() was written and tested in
+isolation (Phase 2) but ticket_creation.py never actually called it --
+tickets were created directly from localize_all() output. Caught by
+deliberately checking "does X call Y" via grep before assuming the
+pipeline was complete, not by the test suite (existing tests only
+verified the filter function itself worked, not that anything used it).
+Fixed by wiring it in and adding a dedicated integration test.
+
+## Case: timezone-naive default crashed the outage filter with real data
+noise_filter.py defaulted to datetime.utcnow() (timezone-naive) when no
+`now` was passed explicitly. Every existing test passed `now=` manually
+with a timezone-aware value, masking the bug. It only surfaced when
+ticket_creation.py called the filter without specifying `now`, using
+real timezone-aware outage timestamps -- a TypeError on comparison.
+Fixed by switching to datetime.now(timezone.utc). Good example of a test
+suite giving false confidence: 100% pass rate, but a real code path was
+untested until a new integration test exercised the actual call site.
+
+## Case: single DT fault fragmented into 3 tickets on first real live test
+Injecting a live DT fault against the running system (not a unit test)
+produced 3 separate span-level tickets over ~3 minutes instead of 1
+DT-level ticket, caused by realistic telemetry coverage gaps making
+different branches of the same fault cross the debounce threshold at
+different times. Not caught by any existing test, since all prior tests
+used complete, simultaneous telemetry for a given fault. Caught only by
+running the full live pipeline end-to-end and reading actual ticket
+timestamps, not by code review or unit tests. Documented in DECISIONS.md
+as a known limitation rather than silently fixed, since the fix requires
+a product decision (ticket merging/upgrading strategy) beyond a quick
+patch.
