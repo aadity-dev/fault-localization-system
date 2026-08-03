@@ -129,3 +129,12 @@ Future improvement:
 - Merge correlated span incidents within the same DT.
 - Upgrade correlated span incidents into a DT-level ticket once sufficient
   evidence becomes available.
+
+##
+## Scheduled-outage filter wired into ticket creation, not just built
+noise_filter.py's filter_scheduled_outages() existed since Phase 2 but
+was not actually called by ticket_creation.py until caught and fixed --
+tickets were being created directly from localize_all() output,
+bypassing the noise filter entirely. Fixed by wiring it in and adding
+tests/test_ticket_creation.py to prove the wiring, not just the filter
+function in isolation.
