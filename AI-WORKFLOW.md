@@ -109,3 +109,17 @@ timestamps, not by code review or unit tests. Documented in DECISIONS.md
 as a known limitation rather than silently fixed, since the fix requires
 a product decision (ticket merging/upgrading strategy) beyond a quick
 patch.
+
+##### Case: background worker silently died after its first empty poll
+The Redis client on this machine raised TimeoutError at the socket level
+on a normal BRPOP polling timeout, instead of returning None as the code
+assumed. Because the worker ran as a background thread via
+run_in_executor, this exception didn't crash the server or show up as an
+obvious error -- it just silently ended the worker loop after ~1 second,
+meaning telemetry stopped being processed with no visible symptom except
+"nothing happens after the first fault." Caught by reading a
+"Future exception was never retrieved" warning carefully in server logs,
+not by any test (no existing test exercised the empty-queue polling path
+against a real Redis instance over multiple iterations). Fixed by
+catching the timeout explicitly and verifying with a dedicated 5-iteration
+reproduction before trusting the fix.
