@@ -47,9 +47,22 @@ def pop_telemetry(timeout_seconds: int = 1):
     Called by the worker loop. Blocks up to timeout_seconds waiting for a
     message; returns None on timeout (so the worker loop can check for
     shutdown signals, etc., rather than blocking forever).
+
+    Some redis-py client/socket configurations raise a TimeoutError at the
+    socket level on a normal BRPOP timeout, instead of BRPOP returning
+    None as documented. This is expected, routine behavior (it happens
+    every ~1s whenever the queue is empty), not a real error -- so it's
+    caught here and treated the same as a clean timeout. Letting this
+    propagate uncaught previously killed the background worker thread
+    silently after its first empty poll -- a real bug caught by
+    inspecting the actual traceback rather than assuming Redis itself
+    was broken.
     """
     client = get_redis_client()
-    result = client.brpop(QUEUE_KEY, timeout=timeout_seconds)
+    try:
+        result = client.brpop(QUEUE_KEY, timeout=timeout_seconds)
+    except redis.exceptions.TimeoutError:
+        return None
     if result is None:
         return None
     _, raw = result

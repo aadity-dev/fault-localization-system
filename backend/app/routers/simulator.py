@@ -3,19 +3,15 @@ backend/app/routers/simulator.py
 
 POST /simulate/fault, POST /simulate/restore -- lets the operator UI (or
 a single documented curl command) drive the simulator without a separate
-terminal session. This is what satisfies G5: "the fault simulator is
-runnable from that public URL or from one documented command."
+terminal session. This is what satisfies G5.
 
 Reuses the exact same fault-injection and telemetry-emission logic as
-simulator/*.py (imported directly, not reimplemented) so there is only
-ONE implementation of "what telemetry does a span/DT/feeder fault
-produce" -- the standalone CLI simulator and this HTTP-triggered version
-share it.
+simulator/*.py (imported directly, not reimplemented).
 
-Rather than round-tripping over HTTP to our own /telemetry endpoint (an
-unnecessary hop when we're already in the same process), this pushes
-directly onto the Redis queue via app.ingestion.queue -- the same queue
-/telemetry uses, so behavior is identical from the worker's perspective.
+Rather than round-tripping over HTTP to our own /telemetry endpoint, this
+pushes directly onto the Redis queue via app.ingestion.queue -- the same
+queue /telemetry uses, so behavior is identical from the worker's
+perspective.
 """
 
 import os
@@ -30,9 +26,6 @@ from app.models import Pole
 
 router = APIRouter(prefix="/simulate")
 
-# simulator/ lives as a sibling to backend/ at the repo root -- add it to
-# the path so we can import the exact same fault/telemetry logic used by
-# the standalone CLI, rather than duplicating it here.
 _SIMULATOR_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "simulator")
 if _SIMULATOR_PATH not in sys.path:
     sys.path.insert(0, _SIMULATOR_PATH)
@@ -58,7 +51,7 @@ def _poles_as_dicts(db: Session):
 @router.post("/fault/span")
 def simulate_span_fault(db: Session = Depends(get_db)):
     poles = _poles_as_dicts(db)
-    ground_truth = load_ground_truth()  # falls back gracefully if file absent in prod
+    ground_truth = load_ground_truth()
     result = pick_random_span_fault(poles, ground_truth)
 
     by_id = {p["pole_id"]: p for p in poles}

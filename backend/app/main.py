@@ -64,12 +64,12 @@ def on_startup():
 def health_check():
     return {"status": "ok"}
 
-
-from app.routers import ingest, tickets
+from app.routers import ingest, tickets, scheduled_outages, simulator
 
 app.include_router(ingest.router, tags=["ingest"])
 app.include_router(tickets.router, tags=["tickets"])
-
+app.include_router(scheduled_outages.router, tags=["scheduled-outages"])
+app.include_router(simulator.router, tags=["simulator"])
 # --- Remaining routers get registered here as they're built (Phase 5) ---
 # from app.routers import scheduled_outages, simulator
 # app.include_router(scheduled_outages.router, prefix="/scheduled-outages", tags=["scheduled-outages"])
