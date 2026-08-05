@@ -312,12 +312,7 @@ instinctively prioritises the one we're most sure about.
   by the algorithm, not by asking a non-engineer to fix data at 2am.
 - Lightweight authentication. We use a Streamlit session-state login gate to satisfy the operational auditing requirement (tracking which employee closed a ticket via `closed_by`). We deliberately avoided a full JWT backend to keep the architectural footprint small and focused on the core graph problem.
 
-**What we expect to be wrong**: the ticket list will get unwieldy past
-~50 concurrent faults (a monsoon peak day). A production system would
-need pagination, filtering by feeder/area, and probably a map view. We
-chose a flat list because it's honest about what we built and doesn't
-pretend a leaflet map pin is useful when 60% of our locations are
-MST-inferred estimates.
+**Dynamic Layout & Map View**: To prevent the dashboard from becoming an overwhelming wall of text during a major incident, the UI is organized into tabs (Active Tickets, Live Map, Simulator & History). The Map view is intentionally dynamic: fault pins change color in real-time based on the ticket's lifecycle state (Red for detected → Green for verified). This gives the operator instant geospatial awareness of repair progress without needing to read every ticket.
 
 ## The AI feature
 
