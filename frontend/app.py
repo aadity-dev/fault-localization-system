@@ -28,7 +28,66 @@ import pandas as pd
 import requests
 import streamlit as st
 
-st.set_page_config(page_title="Fault Control Room", layout="wide")
+st.set_page_config(page_title="Fault Control Room", layout="wide", page_icon="⚡")
+
+st.markdown("""
+<style>
+    /* Dark Premium Background */
+    .stApp {
+        background-color: #0a0f1c;
+        color: #e2e8f0;
+    }
+    
+    /* Make headers transparent so they blend in */
+    [data-testid="stHeader"] {
+        background: transparent;
+    }
+    
+    /* Premium Glassmorphism Cards for Tickets */
+    [data-testid="stVerticalBlock"] > div > div[data-testid="stVerticalBlockBorderWrapper"] {
+        background: rgba(30, 41, 59, 0.6) !important;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 16px !important;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    [data-testid="stVerticalBlock"] > div > div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    }
+    
+    /* Modern, Glowing Buttons */
+    .stButton > button {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+        color: #38bdf8 !important;
+        border: 1px solid rgba(56, 189, 248, 0.4) !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%) !important;
+        color: #ffffff !important;
+        box-shadow: 0 0 15px rgba(14, 165, 233, 0.5) !important;
+        border: 1px solid #0ea5e9 !important;
+        transform: translateY(-2px);
+    }
+
+    /* Glow effect for main title */
+    h1 {
+        background: -webkit-linear-gradient(45deg, #38bdf8, #818cf8);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 800 !important;
+        letter-spacing: -0.5px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Local dev (running `streamlit run app.py` directly): defaults to
 # localhost. Inside Docker Compose: set via the API_BASE env var to
