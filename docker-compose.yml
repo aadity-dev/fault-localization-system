@@ -7,25 +7,50 @@ services:
       POSTGRES_PASSWORD: admin
     ports: ["5432:5432"]
     volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d gridfault"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7
     ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   backend:
-    build: ./backend
-    depends_on: [db, redis]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports: ["8000:8000"]
     environment:
       DATABASE_URL: postgresql://admin:admin@db:5432/gridfault
       REDIS_URL: redis://redis:6379
-    volumes:
-      - ./data:/app/data
+      # ANTHROPIC_API_KEY: set this to enable the AI ticket-summary feature.
+      # Left unset by default -- the feature degrades gracefully to a
+      # deterministic template summary with no API key (see
+      # app/services/ai_feature.py). A reviewer running this stack with
+      # no key of their own will see template summaries, not an error.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
 
   frontend:
-    build: ./frontend
-    depends_on: [backend]
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      - backend
     ports: ["8501:8501"]
+    environment:
+      API_BASE: http://backend:8000
 
 volumes:
   pgdata:
