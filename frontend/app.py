@@ -66,7 +66,7 @@ NEXT_STATUS = {
 
 def api_get(path, params=None):
     try:
-        r = requests.get(f"{API_BASE}{path}", params=params, timeout=5)
+        r = requests.get(f"{API_BASE}{path}", params=params, timeout=60)
         r.raise_for_status()
         return r.json()
     except requests.RequestException as e:
