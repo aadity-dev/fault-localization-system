@@ -1,6 +1,7 @@
 # Fault Localization System
 
 🚀 **Live Demo:** [https://fault-localization-system-1.onrender.com/](https://fault-localization-system-1.onrender.com/)
+*(Note: Hosted on Render Free Tier. If it hasn't been accessed in 15 minutes, it will take ~45 seconds to spin up on the first click. Please be patient!)*
 
 A system for the (fictional) Karnataka State Power Distribution Board that
 turns raw pole-level "is this pole lit?" telemetry into a located,

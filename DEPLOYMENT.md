@@ -78,6 +78,8 @@ AI feature's fallback guarantee.
 
 ## Cloud deployment (Render / Railway / Fly.io)
 
+*(Note: If deploying on Render's Free Tier, be aware that services spin down after 15 minutes of inactivity. The next request will experience a "cold start" delay of ~45-60 seconds. This is normal and expected for free-tier hosting. The `API_BASE` should also point to the external Render URL for the backend, not the internal Docker network hostname).*
+
 1. Push the repo to a public GitHub URL.
 2. Create a new project on your platform with Docker Compose support, or
    deploy each service individually:
