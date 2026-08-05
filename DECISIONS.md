@@ -151,7 +151,7 @@ Per the brief's explicit warning against LLM-based localization, the one
 AI feature sits strictly after localization: it summarizes an
 already-correct structured ticket in plain language for the operator. It
 never influences where a fault is located. Falls back to a deterministic
-template with zero API dependency if no ANTHROPIC_API_KEY is set or any
+template with zero API dependency if no GEMINI_API_KEY is set or any
 API call fails -- verified with dedicated tests for network failure and
 malformed-response cases, not just the happy path.
 

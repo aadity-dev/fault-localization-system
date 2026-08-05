@@ -35,12 +35,12 @@ services:
     environment:
       DATABASE_URL: postgresql://admin:admin@db:5432/gridfault
       REDIS_URL: redis://redis:6379
-      # ANTHROPIC_API_KEY: set this to enable the AI ticket-summary feature.
+      # GEMINI_API_KEY: set this to enable the AI ticket-summary feature.
       # Left unset by default -- the feature degrades gracefully to a
       # deterministic template summary with no API key (see
       # app/services/ai_feature.py). A reviewer running this stack with
       # no key of their own will see template summaries, not an error.
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
 
   frontend:
     build:

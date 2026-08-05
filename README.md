@@ -31,13 +31,13 @@ The system seeds itself with a synthetic ~700-pole grid on first startup
 operator console (or `POST /simulate/fault/dt/{dt_id}` etc. via the API)
 to inject a fault and watch it become a ticket within ~30-40 seconds.
 
-**Optional**: set `ANTHROPIC_API_KEY` before starting to enable AI-generated
+**Optional**: set `GEMINI_API_KEY` before starting to enable AI-generated
 plain-language ticket summaries. Without it, the system falls back to a
 deterministic template summary automatically — no feature is broken by
 its absence.
 
 ```bash
-export ANTHROPIC_API_KEY=your-key-here
+export GEMINI_API_KEY=your-key-here
 docker compose up --build
 ```
 

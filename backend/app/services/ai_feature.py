@@ -18,9 +18,10 @@ If the model is wrong, misleading, or unavailable, the operator still has
 the full structured ticket (span, pole IDs, confidence, PIN) untouched --
 the summary is a convenience layer, not a dependency.
 
-COST: roughly one short completion per newly-created ticket (a few
-hundred input/output tokens) -- negligible at the outage volumes this
-system handles (12-18/day typical, up to 120 on a monsoon peak day).
+COST: Gemini 2.0 Flash Lite -- roughly one short completion per newly-
+created ticket (a few hundred input/output tokens). At Gemini's pricing
+this is effectively free at the outage volumes this system handles
+(12-18/day typical, up to 120 on a monsoon peak day).
 
 FAILURE MODE: if the API is unavailable, slow, or returns something
 malformed, we fall back to a deterministic template string built from the
@@ -34,8 +35,8 @@ import os
 
 import requests
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent"
 
 
 def _template_fallback(ticket: dict) -> str:
@@ -65,7 +66,7 @@ def summarize_ticket(ticket: dict) -> dict:
     malformed response) falls back to the deterministic template so the
     operator view never breaks because of this feature.
     """
-    if not ANTHROPIC_API_KEY:
+    if not GEMINI_API_KEY:
         return {"summary": _template_fallback(ticket), "source": "template"}
 
     prompt = (
@@ -78,22 +79,24 @@ def summarize_ticket(ticket: dict) -> dict:
 
     try:
         response = requests.post(
-            ANTHROPIC_API_URL,
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
+            f"{GEMINI_API_URL}?key={GEMINI_API_KEY}",
+            headers={"content-type": "application/json"},
             json={
-                "model": "claude-3-5-haiku-20241022",
-                "max_tokens": 100,
-                "messages": [{"role": "user", "content": prompt}],
+                "contents": [
+                    {
+                        "parts": [{"text": prompt}]
+                    }
+                ],
+                "generationConfig": {
+                    "maxOutputTokens": 100,
+                    "temperature": 0.3,
+                },
             },
             timeout=5,
         )
         response.raise_for_status()
         data = response.json()
-        text = data["content"][0]["text"].strip()
+        text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
         if not text:
             raise ValueError("empty response")
         return {"summary": text, "source": "ai"}

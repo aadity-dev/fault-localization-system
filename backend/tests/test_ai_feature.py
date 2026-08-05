@@ -35,14 +35,14 @@ def test_template_fallback_handles_missing_pincode():
 
 
 def test_summarize_ticket_falls_back_without_api_key(monkeypatch):
-    monkeypatch.setattr("app.services.ai_feature.ANTHROPIC_API_KEY", None)
+    monkeypatch.setattr("app.services.ai_feature.GEMINI_API_KEY", None)
     result = summarize_ticket(SAMPLE_SPAN_TICKET)
     assert result["source"] == "template"
     assert len(result["summary"]) > 0
 
 
 def test_summarize_ticket_falls_back_on_network_error(monkeypatch):
-    monkeypatch.setattr("app.services.ai_feature.ANTHROPIC_API_KEY", "fake-key-for-test")
+    monkeypatch.setattr("app.services.ai_feature.GEMINI_API_KEY", "fake-key-for-test")
 
     def raise_connection_error(*args, **kwargs):
         raise ConnectionError("simulated network failure")
@@ -55,7 +55,7 @@ def test_summarize_ticket_falls_back_on_network_error(monkeypatch):
 
 
 def test_summarize_ticket_falls_back_on_malformed_response(monkeypatch):
-    monkeypatch.setattr("app.services.ai_feature.ANTHROPIC_API_KEY", "fake-key-for-test")
+    monkeypatch.setattr("app.services.ai_feature.GEMINI_API_KEY", "fake-key-for-test")
 
     class FakeResponse:
         def raise_for_status(self):
@@ -71,14 +71,14 @@ def test_summarize_ticket_falls_back_on_malformed_response(monkeypatch):
 
 
 def test_summarize_ticket_uses_ai_on_success(monkeypatch):
-    monkeypatch.setattr("app.services.ai_feature.ANTHROPIC_API_KEY", "fake-key-for-test")
+    monkeypatch.setattr("app.services.ai_feature.GEMINI_API_KEY", "fake-key-for-test")
 
     class FakeResponse:
         def raise_for_status(self):
             pass
 
         def json(self):
-            return {"content": [{"text": "Span fault, 5 poles dark, high confidence."}]}
+            return {"candidates": [{"content": {"parts": [{"text": "Span fault, 5 poles dark, high confidence."}]}}]}
 
     monkeypatch.setattr("app.services.ai_feature.requests.post", lambda *a, **k: FakeResponse())
 
