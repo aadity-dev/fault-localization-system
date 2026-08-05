@@ -31,12 +31,46 @@ import streamlit as st
 st.set_page_config(page_title="Fault Control Room", layout="wide", page_icon="⚡")
 
 if "logged_in_emp" not in st.session_state:
-    st.title("🔒 Operator Login")
-    st.caption("Karnataka State Power Distribution Board")
+    st.markdown(
+        """
+        <style>
+        /* Center the login container and add a beautiful card effect */
+        div[data-testid="stForm"] {
+            max-width: 400px;
+            margin: 10vh auto;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        /* Style the submit button with a premium gradient */
+        div[data-testid="stFormSubmitButton"] > button {
+            width: 100%;
+            background: linear-gradient(135deg, #0052D4 0%, #4364F7 50%, #6FB1FC 100%);
+            color: white;
+            border: none;
+            padding: 10px 0;
+            border-radius: 8px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+        }
+        div[data-testid="stFormSubmitButton"] > button:hover {
+            box-shadow: 0 4px 15px rgba(67, 100, 247, 0.4);
+            transform: translateY(-1px);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    
+    st.markdown("<h1 style='text-align: center; margin-top: 5vh;'>⚡ Secure Portal</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #666; margin-bottom: 2rem;'>Karnataka State Power Distribution Board</p>", unsafe_allow_html=True)
+    
     with st.form("login_form"):
         emp_id = st.text_input("Employee ID", placeholder="e.g. EMP-101")
-        password = st.text_input("Password", type="password", placeholder="Password is: grid2026")
-        if st.form_submit_button("Login"):
+        password = st.text_input("Master Password", type="password", placeholder="Password is: grid2026")
+        if st.form_submit_button("AUTHENTICATE"):
             if emp_id and password == "grid2026":
                 st.session_state.logged_in_emp = emp_id
                 st.rerun()
