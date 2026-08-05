@@ -30,6 +30,20 @@ import streamlit as st
 
 st.set_page_config(page_title="Fault Control Room", layout="wide", page_icon="⚡")
 
+if "logged_in_emp" not in st.session_state:
+    st.title("🔒 Operator Login")
+    st.caption("Karnataka State Power Distribution Board")
+    with st.form("login_form"):
+        emp_id = st.text_input("Employee ID", placeholder="e.g. EMP-101")
+        password = st.text_input("Password", type="password", placeholder="Password is: grid2026")
+        if st.form_submit_button("Login"):
+            if emp_id and password == "grid2026":
+                st.session_state.logged_in_emp = emp_id
+                st.rerun()
+            else:
+                st.error("Invalid credentials (use password: grid2026)")
+    st.stop()
+
 # Local dev (running `streamlit run app.py` directly): defaults to
 # localhost. Inside Docker Compose: set via the API_BASE env var to
 # http://backend:8000 (the service name), since "localhost" inside a
@@ -93,8 +107,16 @@ def age_minutes(iso_ts):
 # ---------------------------------------------------------------------
 # Header
 # ---------------------------------------------------------------------
-st.title("⚡ Fault Control Room")
-st.caption("Karnataka State Power Distribution Board — subdivision fault localization")
+col_title, col_user = st.columns([4, 1])
+with col_title:
+    st.title("⚡ Fault Control Room")
+    st.caption("Karnataka State Power Distribution Board — subdivision fault localization")
+with col_user:
+    st.write("")  # vertical padding
+    st.caption(f"Logged in as **{st.session_state.logged_in_emp}**")
+    if st.button("Logout"):
+        del st.session_state["logged_in_emp"]
+        st.rerun()
 
 col_refresh, col_auto = st.columns([1, 3])
 with col_refresh:
@@ -170,13 +192,9 @@ else:
                         st.rerun()
 
             if t["status"] == "verified":
-                emp_id = action_cols[2].text_input("Emp ID", key=f"emp-{t['id']}", placeholder="Emp ID", label_visibility="collapsed")
-                if action_cols[3].button("📁 Close", key=f"close-{t['id']}"):
-                    if not emp_id:
-                        st.error("Employee ID is required to close!")
-                    else:
-                        api_patch(f"/tickets/{t['id']}/status", json={"new_status": "closed", "closed_by": emp_id})
-                        st.rerun()
+                if action_cols[2].button("📁 Close", key=f"close-{t['id']}"):
+                    api_patch(f"/tickets/{t['id']}/status", json={"new_status": "closed", "closed_by": st.session_state.logged_in_emp})
+                    st.rerun()
 
 # ---------------------------------------------------------------------
 # Map view
