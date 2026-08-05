@@ -21,6 +21,7 @@ from app.graph.localize import localize_all
 from app.graph.noise_filter import filter_scheduled_outages
 from app.models import Pole, Ticket, Transformer
 from app.services import scheduled_outages_store
+from app.services.geocoding import resolve_pincode
 
 
 def _pole_to_dict(p: Pole) -> dict:
@@ -105,7 +106,8 @@ def process_dark_poles_into_tickets(db: Session, dark_pole_ids: set):
         if incident["incident_type"] == "span":
             p = pole_lookup.get(incident.get("downstream_pole"))
             if p:
-                lat, lon, pincode = p.lat, p.lon, p.pincode
+                lat, lon = p.lat, p.lon
+                pincode, _ = resolve_pincode(p.pincode, p.ward)
         elif incident["incident_type"] == "dt":
             d = dt_lookup.get(incident.get("dt_id"))
             if d:
