@@ -76,6 +76,17 @@ def on_pole_state_change(tracker: PoleStateTracker):
 
 @app.on_event("startup")
 def on_startup():
+    from sqlalchemy import text
+    db = SessionLocal()
+    try:
+        # Safe migration for adding the new column to existing databases
+        db.execute(text("ALTER TABLE tickets ADD COLUMN closed_by VARCHAR;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+        
     seed_database()
     asyncio.get_event_loop().run_in_executor(
         None, run_worker_loop, shared_tracker, on_pole_state_change

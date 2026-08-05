@@ -26,10 +26,13 @@ class TicketOut(BaseModel):
     detected_at: str
     resolved_at: Optional[str] = None
     verified_at: Optional[str] = None
+    closed_at: Optional[str] = None
+    closed_by: Optional[str] = None
 
     class Config:
         from_attributes = True
 
 
 class TicketStatusUpdate(BaseModel):
-    new_status: str   # "acknowledged" | "crew_assigned" | "resolved"
+    new_status: str   # "acknowledged" | "crew_assigned" | "resolved" | "closed"
+    closed_by: Optional[str] = None

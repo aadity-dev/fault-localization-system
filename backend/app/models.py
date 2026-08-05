@@ -91,5 +91,6 @@ class Ticket(Base):
     resolved_at = Column(String, nullable=True)         # lineman claims fixed
     verified_at = Column(String, nullable=True)          # telemetry CONFIRMS fixed
     closed_at = Column(String, nullable=True)
+    closed_by = Column(String, nullable=True)           # dispatcher/employee ID
 
     suppressed_reason = Column(String, nullable=True)   # set if this was a suppressed noise incident, kept for audit

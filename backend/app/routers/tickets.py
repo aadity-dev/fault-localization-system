@@ -68,6 +68,10 @@ def update_ticket_status(ticket_id: int, body: TicketStatusUpdate, db: Session =
         ticket.crew_assigned_at = now
     elif new_status == "resolved":
         ticket.resolved_at = now
+    elif new_status == "closed":
+        ticket.closed_at = now
+        if body.closed_by:
+            ticket.closed_by = body.closed_by
 
     db.commit()
     db.refresh(ticket)
