@@ -76,13 +76,18 @@ def on_pole_state_change(tracker: PoleStateTracker):
 
 @app.on_event("startup")
 def on_startup():
-    from sqlalchemy import text
+    from sqlalchemy import text, inspect
     db = SessionLocal()
     try:
-        # Safe migration for adding the new column to existing databases
-        db.execute(text("ALTER TABLE tickets ADD COLUMN closed_by VARCHAR;"))
-        db.commit()
-    except Exception:
+        inspector = inspect(db.get_bind())
+        if "tickets" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("tickets")]
+            if "closed_by" not in columns:
+                db.execute(text("ALTER TABLE tickets ADD COLUMN closed_by VARCHAR;"))
+                db.commit()
+                print("[startup] Migrated schema: added closed_by column")
+    except Exception as e:
+        print(f"[startup] Migration error (ignoring): {e}")
         db.rollback()
     finally:
         db.close()
