@@ -220,6 +220,8 @@ worker dedup/debounce) — see `backend/tests/`.
 Tickets move through: detected → acknowledged → crew_assigned → resolved
 → verified → closed (`app/services/ticket_lifecycle.py`).
 
+When moving from `verified` to `closed`, the UI automatically passes the logged-in operator's Employee ID to the backend to populate the `closed_by` field for auditing purposes.
+
 The one rule enforced strictly: **verified can only be reached via
 telemetry confirmation, never a direct status update.** A `PATCH
 /tickets/{id}/status` request setting status="verified" is rejected
@@ -308,9 +310,7 @@ instinctively prioritises the one we're most sure about.
   an operator dispatching a crew doesn't need to see MST edges.
 - No manual topology editing. The 60% missing-topology problem is handled
   by the algorithm, not by asking a non-engineer to fix data at 2am.
-- No user authentication. A real deployment would need it; for this
-  assignment it would add complexity without demonstrating any relevant
-  engineering skill.
+- Lightweight authentication. We use a Streamlit session-state login gate to satisfy the operational auditing requirement (tracking which employee closed a ticket via `closed_by`). We deliberately avoided a full JWT backend to keep the architectural footprint small and focused on the core graph problem.
 
 **What we expect to be wrong**: the ticket list will get unwieldy past
 ~50 concurrent faults (a monsoon peak day). A production system would

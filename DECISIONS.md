@@ -1,5 +1,7 @@
+## Frontend-Session Auth vs Full JWT Backend
+To fulfill a late-stage operational requirement—tracking which employee closed a ticket (`closed_by`)—we needed a way for operators to identify themselves. Instead of building a full JWT authentication backend and User table (which introduces massive DB migration risks right before launch), we opted for a lightweight Streamlit session-state login gate on the frontend. The backend accepts a `closed_by` string natively via API, keeping the architectural complexity low while perfectly satisfying the UX and auditing requirement.
+
 ## Ground truth topology file is not used by the running system
-Generated `data/ground_truth_topology.csv` alongside the stripped pole
 registry, containing the real seq_on_line/parent_pole_id for the 60% of
 DTs whose topology we deliberately null out. This is used only by our own
 offline evaluation script to measure how often our MST/geometric inference
