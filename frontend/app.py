@@ -59,6 +59,15 @@ STATUS_COLORS = {
     "closed": "⚪",
 }
 
+HEX_COLORS = {
+    "detected": "#ff0000",       # Red
+    "acknowledged": "#ffa500",   # Orange
+    "crew_assigned": "#ffff00",  # Yellow
+    "resolved": "#0000ff",       # Blue
+    "verified": "#008000",       # Green
+    "closed": "#808080",         # Gray
+}
+
 NEXT_STATUS = {
     "detected": "acknowledged",
     "acknowledged": "crew_assigned",
@@ -214,8 +223,16 @@ with tab_map:
     st.subheader("Map")
     mappable = [t for t in open_tickets if t.get("fault_lat") and t.get("fault_lon")]
     if mappable:
-        df = pd.DataFrame([{"lat": t["fault_lat"], "lon": t["fault_lon"]} for t in mappable])
-        st.map(df, size=50)
+        df = pd.DataFrame([
+            {
+                "lat": t["fault_lat"], 
+                "lon": t["fault_lon"], 
+                "color": HEX_COLORS.get(t["status"], "#ff0000")
+            } for t in mappable
+        ])
+        st.map(df, latitude="lat", longitude="lon", color="color", size=100)
+        
+        st.caption("🔴 Detected | 🟠 Acknowledged | 🟡 Crew Assigned | 🔵 Resolved | 🟢 Verified")
     else:
         st.caption("No mappable (span/DT-level) incidents right now.")
 
