@@ -14,7 +14,7 @@ runs inside containers.
 ## Quick start (local)
 
 ```bash
-git clone <this-repo-url>
+git clone https://github.com/aadity-dev/fault-localization-system.git
 cd fault-localization-system
 docker compose up --build
 ```
