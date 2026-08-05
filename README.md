@@ -24,7 +24,7 @@ docker compose up --build
 ```
 
 Then open:
-- **Operator console**: http://localhost:8501 *(Login with any Employee ID, Password: `grid2026`)*
+- **Operator console**: http://localhost:8501
 - **API docs**: http://localhost:8000/docs
 
 The system seeds itself with a synthetic ~700-pole grid on first startup — no manual data loading required. Use the **Simulator** panel in the operator console (or `POST /simulate/fault/dt/{dt_id}` via the API) to inject a fault and watch it become a ticket within ~30-40 seconds.

@@ -220,7 +220,7 @@ worker dedup/debounce) — see `backend/tests/`.
 Tickets move through: detected → acknowledged → crew_assigned → resolved
 → verified → closed (`app/services/ticket_lifecycle.py`).
 
-When moving from `verified` to `closed`, the UI automatically passes the logged-in operator's Employee ID to the backend to populate the `closed_by` field for auditing purposes.
+
 
 The one rule enforced strictly: **verified can only be reached via
 telemetry confirmation, never a direct status update.** A `PATCH
@@ -310,7 +310,9 @@ instinctively prioritises the one we're most sure about.
   an operator dispatching a crew doesn't need to see MST edges.
 - No manual topology editing. The 60% missing-topology problem is handled
   by the algorithm, not by asking a non-engineer to fix data at 2am.
-- Lightweight authentication. We use a Streamlit session-state login gate to satisfy the operational auditing requirement (tracking which employee closed a ticket via `closed_by`). We deliberately avoided a full JWT backend to keep the architectural footprint small and focused on the core graph problem.
+- No user authentication. A real deployment would need it; for this
+  assignment it would add complexity without demonstrating any relevant
+  engineering skill. We capture an Operator ID in the UI solely for auditing ticket closures (`closed_by`).
 
 **Dynamic Layout & Map View**: To prevent the dashboard from becoming an overwhelming wall of text during a major incident, the UI is organized into tabs (Active Tickets, Live Map, Simulator & History). The Map view is intentionally dynamic: fault pins change color in real-time based on the ticket's lifecycle state (Red for detected → Green for verified). This gives the operator instant geospatial awareness of repair progress without needing to read every ticket.
 

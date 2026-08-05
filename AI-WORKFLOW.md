@@ -13,9 +13,6 @@ span fault) rather than trusting it blindly.
 
 ## Cases where AI output needed correction
 
-### Case: Rapid late-stage UI pivot to add authentication safely
-Right before launch, a requirement was added to track which employee closed a ticket (`closed_by`). Adding a full authentication system (JWT, Users table) would introduce massive database migration risk to the live Postgres instance. We used AI to quickly architect and deploy a lightweight Streamlit session-state login gate. The AI generated the implementation plan, recognized the DB risks, and safely injected the session logic into the frontend, saving hours of potentially destructive backend refactoring while perfectly satisfying the UX requirement.
-
 ### Case: feeder-rollup logic wrongly fired on single-DT feeders
 First version of localize_feeder() rolled up to a feeder incident whenever
 "every DT on the feeder" matched a full-DT-outage set — but for a
