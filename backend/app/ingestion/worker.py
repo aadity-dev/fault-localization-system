@@ -47,7 +47,11 @@ class PoleStateTracker:
         seq = payload["seq"]
 
         last = self.last_seq.get(device_id)
-        if last is not None and seq <= last:
+        # Boot events reset the sequence counter on the physical device to 0.
+        # We must accept them even if their seq is lower than the last seen seq.
+        is_boot = payload.get("event") == "boot"
+        
+        if last is not None and seq <= last and not is_boot:
             return True  # duplicate or out-of-order/old message for this device
 
         ts = datetime.fromisoformat(payload["ts"].replace("Z", "+00:00"))
