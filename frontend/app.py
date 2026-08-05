@@ -20,6 +20,7 @@ ARCHITECTURE.md's "UI reasoning" section):
     reflects that honestly instead of inventing a fake coordinate.
 """
 
+import os
 import time
 from datetime import datetime, timezone
 
@@ -29,7 +30,11 @@ import streamlit as st
 
 st.set_page_config(page_title="Fault Control Room", layout="wide")
 
-API_BASE = "http://localhost:8000"
+# Local dev (running `streamlit run app.py` directly): defaults to
+# localhost. Inside Docker Compose: set via the API_BASE env var to
+# http://backend:8000 (the service name), since "localhost" inside a
+# container refers to the container itself, not the backend container.
+API_BASE = os.getenv("API_BASE", "http://localhost:8000")
 
 STATUS_COLORS = {
     "detected": "🔴",
