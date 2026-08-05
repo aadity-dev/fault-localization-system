@@ -14,11 +14,14 @@ FastAPI entrypoint. Jobs:
 """
 
 import asyncio
+import json
+from datetime import datetime, timezone
 
 from fastapi import FastAPI
 
 from app.database import SessionLocal
 from app.ingestion.worker import PoleStateTracker, run_worker_loop, shared_tracker
+from app.models import Ticket
 from app.seed import seed_database
 from app.services.ticket_creation import process_dark_poles_into_tickets
 
@@ -32,22 +35,41 @@ app = FastAPI(
 def on_pole_state_change(tracker: PoleStateTracker):
     """
     Called by the worker loop whenever telemetry changes pole state.
-    Runs the (small, debounced) set of confirmed-dark poles through
-    localization and creates tickets for any new incident.
+    Two jobs:
+    1. Run the (small, debounced) set of confirmed-dark poles through
+       localization and create tickets for any new incident.
+    2. Auto-verify: scan resolved tickets and verify them automatically
+       when all affected poles are confirmed live from telemetry.
+       This satisfies the brief's requirement: "When the affected poles
+       come back to life, the system should say so on its own."
 
     Opens its own DB session since this runs in a background thread,
     separate from FastAPI's request-scoped sessions.
     """
-    dark_poles = tracker.debounced_dark_poles()
-    if not dark_poles:
-        return
-
     db = SessionLocal()
     try:
-        created = process_dark_poles_into_tickets(db, dark_poles)
-        if created:
-            print(f"[tickets] created {len(created)} new ticket(s): "
-                  f"{[(t.id, t.incident_type) for t in created]}")
+        # --- 1. Create new tickets for debounced dark poles ---
+        dark_poles = tracker.debounced_dark_poles()
+        if dark_poles:
+            created = process_dark_poles_into_tickets(db, dark_poles)
+            if created:
+                print(f"[tickets] created {len(created)} new ticket(s): "
+                      f"{[(t.id, t.incident_type) for t in created]}")
+
+        # --- 2. Auto-verify resolved tickets ---
+        resolved_tickets = db.query(Ticket).filter(Ticket.status == "resolved").all()
+        for ticket in resolved_tickets:
+            affected_poles = json.loads(ticket.affected_poles_json)
+            still_dark = [
+                p for p in affected_poles
+                if not tracker.energized.get(p, False)
+            ]
+            if not still_dark:
+                ticket.status = "verified"
+                ticket.verified_at = datetime.now(timezone.utc).isoformat()
+                db.commit()
+                print(f"[auto-verify] ticket {ticket.id} ({ticket.incident_type}) "
+                      f"auto-verified — all {len(affected_poles)} affected poles confirmed live")
     finally:
         db.close()
 
@@ -70,7 +92,3 @@ app.include_router(ingest.router, tags=["ingest"])
 app.include_router(tickets.router, tags=["tickets"])
 app.include_router(scheduled_outages.router, tags=["scheduled-outages"])
 app.include_router(simulator.router, tags=["simulator"])
-# --- Remaining routers get registered here as they're built (Phase 5) ---
-# from app.routers import scheduled_outages, simulator
-# app.include_router(scheduled_outages.router, prefix="/scheduled-outages", tags=["scheduled-outages"])
-# app.include_router(simulator.router, prefix="/simulate", tags=["simulator"])

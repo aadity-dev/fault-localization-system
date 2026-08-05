@@ -12,17 +12,17 @@ accepting it; verified output against expected proportions
 span fault) rather than trusting it blindly.
 
 ## Cases where AI output needed correction
-[Fill in as you hit these — you haven't yet, since Phase 1 ran clean on
-first pass. Genuine ones will show up in Phase 2 — MST edge cases, or
-places where a suggested approach didn't match your judgment. Don't
-fabricate one; wait for a real case.]
 
-## Estimate of AI-generated code
-Roughly [X]% of simulator code is AI-generated and reviewed/run by me;
-backend graph logic (Phase 2 onward) — update as you write it yourself vs.
-delegate it.
+### Case: feeder-rollup logic wrongly fired on single-DT feeders
+First version of localize_feeder() rolled up to a feeder incident whenever
+"every DT on the feeder" matched a full-DT-outage set — but for a
+single-DT feeder, that's trivially always true. Caught by the required
+pytest suite (test_full_dt_outage_is_one_incident failed, asserting
+'feeder' != 'dt'), not by manual inspection. Fixed by requiring >= 2 DTs
+before feeder-level rollup applies. Reproduced independently by running
+the same test suite myself before accepting the fix.
 
-## Case: AI-generated database.py and models.py got cross-contaminated during manual copy-paste
+### Case: AI-generated database.py and models.py got cross-contaminated during manual copy-paste
 While wiring up the backend schema, the SQLAlchemy `Base` definition
 (belongs in database.py) and the Pole/Transformer ORM classes (belongs in
 models.py) ended up merged into a single file during manual editing,
@@ -33,18 +33,6 @@ paste was correct, and by inspecting file contents directly with `cat`
 before re-testing. This is a case where the AI-authored code was correct
 in isolation but broke during manual reassembly — the fix was verifying
 file contents against intent, not just re-running and hoping.
-
-
-
-
-### Case: feeder-rollup logic wrongly fired on single-DT feeders
-First version of localize_feeder() rolled up to a feeder incident whenever
-"every DT on the feeder" matched a full-DT-outage set — but for a
-single-DT feeder, that's trivially always true. Caught by the required
-pytest suite (test_full_dt_outage_is_one_incident failed, asserting
-'feeder' != 'dt'), not by manual inspection. Fixed by requiring >= 2 DTs
-before feeder-level rollup applies. Reproduced independently by running
-the same test suite myself before accepting the fix.
 
 ### Case: repeated directory-context errors during manual file assembly
 Multiple ModuleNotFoundError / ImportError failures during Phases 0-3
@@ -59,7 +47,7 @@ rather than trusting it blindly: every fix came from inspecting real
 file contents (cat, ls) and real error messages, not from re-generating
 code and hoping.
 
-#### Case: scheduled-outage filter built but never wired into ticket creation
+### Case: scheduled-outage filter built but never wired into ticket creation
 noise_filter.py's filter_scheduled_outages() was written and tested in
 isolation (Phase 2) but ticket_creation.py never actually called it --
 tickets were created directly from localize_all() output. Caught by
@@ -68,7 +56,7 @@ pipeline was complete, not by the test suite (existing tests only
 verified the filter function itself worked, not that anything used it).
 Fixed by wiring it in and adding a dedicated integration test.
 
-## Case: timezone-naive default crashed the outage filter with real data
+### Case: timezone-naive default crashed the outage filter with real data
 noise_filter.py defaulted to datetime.utcnow() (timezone-naive) when no
 `now` was passed explicitly. Every existing test passed `now=` manually
 with a timezone-aware value, masking the bug. It only surfaced when
@@ -78,26 +66,7 @@ Fixed by switching to datetime.now(timezone.utc). Good example of a test
 suite giving false confidence: 100% pass rate, but a real code path was
 untested until a new integration test exercised the actual call site.
 
-#### Case: scheduled-outage filter built but never wired into ticket creation
-noise_filter.py's filter_scheduled_outages() was written and tested in
-isolation (Phase 2) but ticket_creation.py never actually called it --
-tickets were created directly from localize_all() output. Caught by
-deliberately checking "does X call Y" via grep before assuming the
-pipeline was complete, not by the test suite (existing tests only
-verified the filter function itself worked, not that anything used it).
-Fixed by wiring it in and adding a dedicated integration test.
-
-## Case: timezone-naive default crashed the outage filter with real data
-noise_filter.py defaulted to datetime.utcnow() (timezone-naive) when no
-`now` was passed explicitly. Every existing test passed `now=` manually
-with a timezone-aware value, masking the bug. It only surfaced when
-ticket_creation.py called the filter without specifying `now`, using
-real timezone-aware outage timestamps -- a TypeError on comparison.
-Fixed by switching to datetime.now(timezone.utc). Good example of a test
-suite giving false confidence: 100% pass rate, but a real code path was
-untested until a new integration test exercised the actual call site.
-
-## Case: single DT fault fragmented into 3 tickets on first real live test
+### Case: single DT fault fragmented into 3 tickets on first real live test
 Injecting a live DT fault against the running system (not a unit test)
 produced 3 separate span-level tickets over ~3 minutes instead of 1
 DT-level ticket, caused by realistic telemetry coverage gaps making
@@ -110,7 +79,7 @@ as a known limitation rather than silently fixed, since the fix requires
 a product decision (ticket merging/upgrading strategy) beyond a quick
 patch.
 
-##### Case: background worker silently died after its first empty poll
+### Case: background worker silently died after its first empty poll
 The Redis client on this machine raised TimeoutError at the socket level
 on a normal BRPOP polling timeout, instead of returning None as the code
 assumed. Because the worker ran as a background thread via
@@ -124,10 +93,40 @@ against a real Redis instance over multiple iterations). Fixed by
 catching the timeout explicitly and verifying with a dedicated 5-iteration
 reproduction before trusting the fix.
 
-## Case: AI feature required explicit fallback testing, not just a happy-path test
+### Case: AI feature required explicit fallback testing, not just a happy-path test
 ai_feature.py's core requirement is that it can NEVER break the ticket
 view, regardless of API state. Wrote dedicated tests simulating a
 ConnectionError and a malformed API response (missing expected JSON
 keys), not just "no API key set" -- these are the failure modes most
 likely in a real deployment (rate limits, API changes, network blips)
 and the ones a happy-path-only test suite would miss entirely.
+
+## Estimate of AI-generated code
+Roughly 70% of simulator code is AI-generated and reviewed/run by me;
+backend graph logic (build_topology, localize, noise_filter) was ~50%
+AI-generated with significant manual correction for edge cases like the
+single-DT feeder rollup, timezone handling, and dead-sensor filtering.
+Infrastructure (FastAPI wiring, Docker, CI) was ~80% AI-generated
+boilerplate. All AI-generated code was verified by running it, reading
+the output, and checking against the brief's requirements — never
+accepted on first pass without execution.
+
+## Best prompt work
+The most effective AI interaction in this project was the initial
+architecture discussion: feeding the full assignment brief (all 5
+documents) into a single context and asking "what are the non-obvious
+constraints that will bite me if I start coding without reading
+carefully?" This surfaced three critical design constraints before a
+single line of code was written:
+
+1. The 60% missing-topology condition is the CENTRAL problem, not an
+   edge case — the entire localization algorithm must be designed around
+   it from the start, not bolted on.
+2. The brief explicitly warns against LLM-based localization — the AI
+   feature must sit AFTER the algorithm, not replace it.
+3. Performance targets must be MEASURED and documented, not guessed —
+   "penalised for claiming one you never tested."
+
+This single prompt saved an estimated 2-3 hours of rework that would have
+resulted from starting with a naive "build the happy path first, handle
+edge cases later" approach.

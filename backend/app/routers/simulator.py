@@ -26,7 +26,11 @@ from app.models import Pole
 
 router = APIRouter(prefix="/simulate")
 
-_SIMULATOR_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "simulator")
+_DOCKER_SIMULATOR_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "simulator"))
+_LOCAL_SIMULATOR_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "simulator"))
+
+_SIMULATOR_PATH = _DOCKER_SIMULATOR_PATH if os.path.exists(_DOCKER_SIMULATOR_PATH) else _LOCAL_SIMULATOR_PATH
+
 if _SIMULATOR_PATH not in sys.path:
     sys.path.insert(0, _SIMULATOR_PATH)
 
@@ -109,16 +113,27 @@ def simulate_feeder_fault(feeder_id: str, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/restore/{pole_id}")
-def simulate_restore(pole_id: str, db: Session = Depends(get_db)):
-    """Sends boot + power_restored for one pole -- lets a demo show a ticket auto-verify."""
-    pole = db.query(Pole).filter(Pole.pole_id == pole_id).first()
-    if not pole or not pole.device_id:
-        return {"error": "pole not found or has no device"}
+@router.post("/restore-ticket/{ticket_id}")
+def simulate_restore_ticket(ticket_id: int, db: Session = Depends(get_db)):
+    """Sends boot + power_restored for all poles affected by a ticket, for the demo video."""
+    import json
+    from app.models import Ticket
 
-    pole_dict = {"pole_id": pole.pole_id, "device_id": pole.device_id}
-    payloads = build_restoration_payloads(pole_dict, seq_start=0)
-    for p in payloads:
-        push_telemetry(p)
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        return {"error": "ticket not found"}
 
-    return {"pole_id": pole_id, "restoration_messages_queued": len(payloads)}
+    affected_poles = json.loads(ticket.affected_poles_json)
+    poles = db.query(Pole).filter(Pole.pole_id.in_(affected_poles)).all()
+
+    total_queued = 0
+    for pole in poles:
+        if not pole.device_id:
+            continue
+        pole_dict = {"pole_id": pole.pole_id, "device_id": pole.device_id}
+        payloads = build_restoration_payloads(pole_dict, seq_start=0)
+        for p in payloads:
+            push_telemetry(p)
+        total_queued += len(payloads)
+
+    return {"ticket_id": ticket_id, "restored_poles": len(poles), "messages_queued": total_queued}

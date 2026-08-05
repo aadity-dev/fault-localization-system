@@ -162,3 +162,58 @@ warns about: a reviewer with no API key of their own seeing
 "unavailable" everywhere. If a pole's ward isn't in our table, we return
 None explicitly rather than fabricating a PIN -- an operator driving to
 a wrong address is worse than an honest gap.
+
+---
+
+## What I would do with two more weeks
+
+1. **Ticket merging / upgrade**: when partial telemetry causes a DT-level
+   fault to initially appear as multiple span-level tickets (documented
+   above), automatically merge them when later telemetry reveals the full
+   scope. Requires a product decision: do we merge into one ticket or
+   link them? Do we notify the operator of the merge? Currently
+   documented as a known limitation rather than silently half-fixed.
+
+2. **Map view with confidence shading**: overlay fault locations on a
+   leaflet map, but shade MST-inferred locations differently from
+   verified ones — an operator should be able to see at a glance which
+   dispatch locations are trustworthy vs. estimated.
+
+3. **Historical fault analytics**: track fault frequency by
+   feeder/DT/span over time. Recurring faults at the same location
+   suggest infrastructure problems, not weather — valuable for
+   preventive maintenance prioritisation.
+
+4. **Move pole state to Redis**: currently in-process memory
+   (PoleStateTracker). Moving to a Redis hash would allow horizontal
+   scaling to multiple API instances, at the cost of a network hop per
+   state read. Not needed at current scale but is the first thing that
+   would break under growth.
+
+5. **Proper authentication + role-based access**: operators vs.
+   supervisors vs. read-only dashboards. Skipped deliberately for this
+   assignment (no engineering signal in an auth layer).
+
+## What I know is currently wrong or fragile
+
+- **Single-process worker**: the background thread approach means one
+  stuck DB query or one slow Gemini API call blocks all telemetry
+  processing until it returns. A production system needs the worker as a
+  separate process with proper crash recovery.
+
+- **Ticket fragmentation under partial telemetry**: the documented
+  DT-to-span downgrade when coverage is incomplete. Not wrong per se
+  (conservative is better than hallucinated), but operationally annoying.
+
+- **MST accuracy degrades near branch points**: 87.6% edge accuracy is
+  good for straight runs but the remaining 12.4% errors cluster where
+  real wires bend around buildings — exactly where correct topology
+  matters most for pinpointing a span fault.
+
+- **No retry on Gemini API failure**: the AI summary falls back to
+  template immediately on any error. A production system might retry once
+  with exponential backoff before falling back, but for this assignment
+  the simpler "fail fast, fall back" is more defensible.
+
+- **Streamlit UI won't scale past ~50 tickets**: no pagination, no
+  filtering by area. Fine for a demo, inadequate for a real monsoon day.

@@ -124,7 +124,7 @@ else:
 
         with st.container(border=True):
             top = st.columns([1, 3, 2, 2, 2])
-            top[0].markdown(f"### {STATUS_COLORS.get(t['status'], '⚫')}")
+            top[0].markdown(f"### {STATUS_COLORS.get(t['status'], '⚫')} Ticket #{t['id']}")
             with top[1]:
                 if t["incident_type"] == "span":
                     st.markdown(f"**Span fault** — `{t['upstream_pole']}` → `{t['downstream_pole']}`")
@@ -142,6 +142,13 @@ else:
 
             if t.get("fault_lat") and t.get("fault_lon"):
                 st.caption(f"Navigate to: {t['fault_lat']:.6f}, {t['fault_lon']:.6f}")
+
+            if st.button("✨ Generate AI Summary", key=f"ai-{t['id']}"):
+                with st.spinner("Analyzing..."):
+                    summary_result = api_get(f"/tickets/{t['id']}/summary")
+                    if summary_result and "summary" in summary_result:
+                        icon = "🤖 AI:" if summary_result.get("source") == "ai" else "📋 Fallback:"
+                        st.info(f"**{icon}** {summary_result['summary']}")
 
             action_cols = st.columns(5)
             if t["status"] in NEXT_STATUS:
@@ -203,9 +210,9 @@ with st.expander("🧪 Simulator — inject faults for demo (satisfies G5)", exp
         result = api_post(f"/simulate/fault/feeder/{feeder_id_input}")
         st.json(result)
 
-    pole_id_input = sim_cols[3].text_input("Pole id to restore", label_visibility="collapsed", placeholder="Pole id")
-    if sim_cols[3].button("Restore pole"):
-        result = api_post(f"/simulate/restore/{pole_id_input}")
+    ticket_id_input = sim_cols[3].text_input("Ticket ID to restore", label_visibility="collapsed", placeholder="Ticket ID")
+    if sim_cols[3].button("Restore ticket"):
+        result = api_post(f"/simulate/restore-ticket/{ticket_id_input}")
         st.json(result)
 
 # ---------------------------------------------------------------------
