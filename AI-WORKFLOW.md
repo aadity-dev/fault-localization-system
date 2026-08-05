@@ -123,3 +123,11 @@ not by any test (no existing test exercised the empty-queue polling path
 against a real Redis instance over multiple iterations). Fixed by
 catching the timeout explicitly and verifying with a dedicated 5-iteration
 reproduction before trusting the fix.
+
+## Case: AI feature required explicit fallback testing, not just a happy-path test
+ai_feature.py's core requirement is that it can NEVER break the ticket
+view, regardless of API state. Wrote dedicated tests simulating a
+ConnectionError and a malformed API response (missing expected JSON
+keys), not just "no API key set" -- these are the failure modes most
+likely in a real deployment (rate limits, API changes, network blips)
+and the ones a happy-path-only test suite would miss entirely.

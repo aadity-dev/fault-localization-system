@@ -138,3 +138,27 @@ tickets were being created directly from localize_all() output,
 bypassing the noise filter entirely. Fixed by wiring it in and adding
 tests/test_ticket_creation.py to prove the wiring, not just the filter
 function in isolation.
+## Docker build context is the repo root, not backend/ or frontend/
+Both Dockerfiles need files outside their own folder (backend needs
+simulator/ and data/; the compose file needs both service Dockerfiles
+addressable from one place), so docker-compose.yml sets build context to
+`.` with an explicit `dockerfile:` path for each service, rather than
+`build: ./backend`. COPY paths inside each Dockerfile are written
+relative to the repo root accordingly.
+
+## AI feature: operator-facing ticket summary, not localization
+Per the brief's explicit warning against LLM-based localization, the one
+AI feature sits strictly after localization: it summarizes an
+already-correct structured ticket in plain language for the operator. It
+never influences where a fault is located. Falls back to a deterministic
+template with zero API dependency if no ANTHROPIC_API_KEY is set or any
+API call fails -- verified with dedicated tests for network failure and
+malformed-response cases, not just the happy path.
+
+## PIN code: offline ward lookup, no external geocoding API
+Chose a small, committed, offline ward-to-PIN table over a hosted
+geocoding API, to avoid the exact failure mode 02-data-and-systems.md §5
+warns about: a reviewer with no API key of their own seeing
+"unavailable" everywhere. If a pole's ward isn't in our table, we return
+None explicitly rather than fabricating a PIN -- an operator driving to
+a wrong address is worse than an honest gap.
