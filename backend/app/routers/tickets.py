@@ -17,6 +17,7 @@ from app.database import get_db
 from app.ingestion.worker import shared_tracker
 from app.models import Ticket
 from app.schemas.ticket import TicketOut, TicketStatusUpdate
+from app.services.ai_feature import summarize_ticket
 from app.services.ticket_lifecycle import (
     InvalidTransition,
     VerificationFailed,
@@ -105,3 +106,29 @@ def verify_ticket_endpoint(ticket_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(ticket)
     return ticket
+
+
+@router.get("/{ticket_id}/summary")
+def get_ticket_summary(ticket_id: int, db: Session = Depends(get_db)):
+    """
+    The AI feature. Returns a plain-language summary of the ticket for
+    display in the operator UI. Falls back to a deterministic template
+    if the LLM is unavailable -- see app/services/ai_feature.py for why
+    this can never break the ticket view.
+    """
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    ticket_dict = {
+        "incident_type": ticket.incident_type,
+        "upstream_pole": ticket.upstream_pole,
+        "downstream_pole": ticket.downstream_pole,
+        "dt_id": ticket.dt_id,
+        "feeder_id": ticket.feeder_id,
+        "affected_pole_count": ticket.affected_pole_count,
+        "pincode": ticket.pincode,
+        "topology_status": ticket.topology_status,
+        "confidence": ticket.confidence,
+    }
+    return summarize_ticket(ticket_dict)

@@ -8,3 +8,7 @@ networkx
 pytest
 requests
 redis
+streamlit
+pandas
+requests
+ 
