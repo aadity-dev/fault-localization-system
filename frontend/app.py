@@ -220,22 +220,38 @@ with st.expander("🧪 Simulator — inject faults for demo (satisfies G5)", exp
 
     if sim_cols[0].button("Inject span fault"):
         result = api_post("/simulate/fault/span")
-        st.json(result)
+        if not result.get("_error"):
+            st.toast("⚡ Span fault injected! Awaiting 30s debounce...")
+            st.success("Fault payload sent.")
+        else:
+            st.error(f"Failed: {result.get('detail')}")
 
     dt_id_input = sim_cols[1].text_input("DT id", value="D-010101", label_visibility="collapsed", placeholder="DT id")
     if sim_cols[1].button("Inject DT fault"):
         result = api_post(f"/simulate/fault/dt/{dt_id_input}")
-        st.json(result)
+        if not result.get("_error"):
+            st.toast(f"⚡ DT fault injected at {dt_id_input}!")
+            st.success("Fault payload sent.")
+        else:
+            st.error(f"Failed: {result.get('detail')}")
 
     feeder_id_input = sim_cols[2].text_input("Feeder id", value="F-01-01", label_visibility="collapsed", placeholder="Feeder id")
     if sim_cols[2].button("Inject feeder fault"):
         result = api_post(f"/simulate/fault/feeder/{feeder_id_input}")
-        st.json(result)
+        if not result.get("_error"):
+            st.toast(f"⚡ Feeder fault injected at {feeder_id_input}!")
+            st.success("Fault payload sent.")
+        else:
+            st.error(f"Failed: {result.get('detail')}")
 
     ticket_id_input = sim_cols[3].text_input("Ticket ID to restore", label_visibility="collapsed", placeholder="Ticket ID")
     if sim_cols[3].button("Restore ticket"):
         result = api_post(f"/simulate/restore-ticket/{ticket_id_input}")
-        st.json(result)
+        if not result.get("_error"):
+            st.toast(f"✅ Restoration telemetry sent for ticket #{ticket_id_input}!")
+            st.success("Power restored.")
+        else:
+            st.error(f"Failed: {result.get('detail')}")
 
 # ---------------------------------------------------------------------
 # Closed tickets (collapsed, out of the way)
